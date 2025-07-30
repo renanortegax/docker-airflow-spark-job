@@ -1,0 +1,9 @@
+venv
+__pycache__
+*.pyo
+.git
+*.pyc
+build_log_attempt2.txt
+build_log_attempt3.txt
+README.md
+*.log

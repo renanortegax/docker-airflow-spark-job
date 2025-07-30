@@ -1,0 +1,86 @@
+version: '3'
+
+x-spark-common: &spark-common # sao âncora que permitem que eu use esse bloco de configuracao mais pra frente -> vou usar em <<: *spark-common
+  image: bitnami/spark:latest # Imagem Docker pro Spark
+  volumes:
+    - ./jobs:/opt/bitnami/spark/jobs # Mapeia a pasta local './jobs' para '/opt/bitnami/spark/jobs' no contêiner. Vai ser usada pros scripts em spark
+  networks:
+    - code-with-yu # Conecta os serviços Spark à rede 'code-with-yu' (>>>isso estava no video.. mas nao me parece fazer sentido<<<)
+
+x-airflow-common: &airflow-common # sao âncora que permitem que eu use esse bloco de configuracao mais pra frente -> vou usar em <<: *spark-common
+  build:
+    context: . # O contexto de construção (pasta onde o Dockerfile está) é o diretório atual
+    dockerfile: Dockerfile # Nome do Dockerfile pra ser usado
+  env_file:
+    - airflow.env # carrega as variaveis de ambiente do arquivo 'airflow.env'
+  volumes:
+    - ./jobs:/opt/airflow/jobs # Mapeia a pasta local './jobs' para o Airflow (talvez para DAGs ou recursos de DAG)
+    - ./dags:/opt/airflow/dags # Mapeia a pasta local './dags' para o diretório de DAGs do Airflow. ESSENCIAL para o Airflow encontrar suas DAGs.
+    - ./logs:/opt/airflow/logs # Mapeia a pasta local './logs' para o diretório de logs do Airflow. Importante para persistir logs.
+  depends_on:
+    - postgres # Garante que o serviço 'postgres' seja iniciado antes deste. (Ainda sem o healthcheck, então não garante que o Postgres esteja *pronto*)
+  networks:
+    - code-with-yu # Conecta os serviços Airflow à rede 'code-with-yu'.
+
+services: # aqui de fato é cada container que vai ser criado
+  spark-master:
+    <<: *spark-common # usa a ancora la de cima
+    command: bin/spark-class org.apache.spark.deploy.master.Master # Comando para iniciar o Spark Master dentro do contêiner
+    ports:
+      - "9090:8080" # Mapeia a porta 8080 do contêiner (UI do Spark Master) para a porta 9090 no meu host
+      - "7077:7077" # Mapeia a porta 7077 do contêiner (comunicação interna do Spark) para a porta 7077 no meu host
+
+  spark-worker:
+    <<: *spark-common # usa a ancora la de cima
+    command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077 # Comando para iniciar um Spark Worker, conectando-o ao Master
+    depends_on:
+      - spark-master # garante que o spark-master esteja rodando
+    environment: # variaveis de ambiente pro worker
+      SPARK_MODE: worker
+      SPARK_WORKER_CORES: 2
+      SPARK_WORKER_MEMORY: 1g
+      SPARK_MASTER_URL: spark://spark-master:7077
+
+  postgres:
+    image: postgres:14.0
+    environment: # variaveis de ambiente pro postgres
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    networks:
+      - code-with-yu
+    # volumes:
+    #   - pgdata:/var/lib/postgresql/data # talvez ver de adicionar um volume nomeado aqui para persistir os dados do banco de dados
+    ## esse "pgdata:" trata-se de um volume nomeado que o Docker cria automaticamente - geralmente /var/lib/docker/volumes/ no Linux (WSL)
+    # Junto disso, precisa adicionar a seção 'volumes:' no final do arquivo
+
+  webserver:
+    <<: *airflow-common # usa a ancora la de cima
+    # command para garantir que o db do airflow esteja pronto antes de iniciar o webserver
+    command: bash -c "while ! airflow db check; do sleep 3; done; airflow webserver"
+    # command: webserver
+    ports:
+      - "8080:8080" # Mapeia a porta 8080 do contêiner (UI do Airflow) para a porta 8080 no seu host - abrir localhost:8080 no navegador para acessar a interface do Airflow
+    depends_on:
+      - scheduler
+
+  scheduler:
+    <<: *airflow-common # usa a ancora la de cima
+    command: bash -c "airflow db migrate && airflow users create --username admin --firstname Yusuf --lastname Ganiyu --role Admin --email airscholar@gmail.com --password admin && airflow scheduler"
+    # Este comando executa uma sequência de operações:
+      # Obs: `&&`: o próximo comando só é executado se o anterior for bem-sucedido.
+    # - `airflow db migrate`: Inicializa ou migra o esquema do banco de dados do Airflow.
+    # - `airflow users create ...`: Cria um usuário administrador no Airflow.
+    # - `airflow scheduler`: Finalmente, inicia o scheduler do Airflow.
+
+networks:
+  code-with-yu:
+
+# Caso va adicionar volumes pra postgres
+# volumes: # Esta seção define os volumes nomeados
+#   pgdata: # Declara o volume nomeado 'pgdata'
+#     # Você pode adicionar drivers ou opções aqui, mas para o básico, deixar vazio já funciona.
+
+# TODO:
+    # A forma de inicialização no scheduler diretamente no 'command' não é ideal para múltiplos restarts
+      # - pois tentará criar o usuário e migrar o DB toda vez. O serviço `airflow_init` que sugeri anteriormente seria mais robusto.
