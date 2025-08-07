@@ -1,4 +1,4 @@
-version: '3'
+version: '3.8'
 
 x-spark-common: &spark-common # sao âncora que permitem que eu use esse bloco de configuracao mais pra frente -> vou usar em <<: *spark-common
   image: bitnami/spark:latest # Imagem Docker pro Spark
@@ -29,7 +29,9 @@ services: # aqui de fato é cada container que vai ser criado
     ports:
       - "9090:8080" # Mapeia a porta 8080 do contêiner (UI do Spark Master) para a porta 9090 no meu host
       - "7077:7077" # Mapeia a porta 7077 do contêiner (comunicação interna do Spark) para a porta 7077 no meu host
-
+    environment:
+      PYSPARK_PYTHON: python3.11
+      PYSPARK_DRIVER_PYTHON: python3.11
   spark-worker:
     <<: *spark-common # usa a ancora la de cima
     command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077 # Comando para iniciar um Spark Worker, conectando-o ao Master
@@ -40,7 +42,9 @@ services: # aqui de fato é cada container que vai ser criado
       SPARK_WORKER_CORES: 2
       SPARK_WORKER_MEMORY: 1g
       SPARK_MASTER_URL: spark://spark-master:7077
-
+      PYSPARK_PYTHON: python3.11
+      PYSPARK_DRIVER_PYTHON: python3.11
+  
   postgres:
     image: postgres:14.0
     environment: # variaveis de ambiente pro postgres
@@ -54,25 +58,43 @@ services: # aqui de fato é cada container que vai ser criado
     ## esse "pgdata:" trata-se de um volume nomeado que o Docker cria automaticamente - geralmente /var/lib/docker/volumes/ no Linux (WSL)
     # Junto disso, precisa adicionar a seção 'volumes:' no final do arquivo
 
-  webserver:
-    <<: *airflow-common # usa a ancora la de cima
-    # command para garantir que o db do airflow esteja pronto antes de iniciar o webserver
-    command: bash -c "while ! airflow db check; do sleep 3; done; airflow webserver"
-    # command: webserver
-    ports:
-      - "8080:8080" # Mapeia a porta 8080 do contêiner (UI do Airflow) para a porta 8080 no seu host - abrir localhost:8080 no navegador para acessar a interface do Airflow
+  # >>> SERVIÇO airflow-init (CRUCIAL!) <<<
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow_init
+    # É VITAL ter 'dockerize' instalado no seu Dockerfile para que isso funcione!
+    command: >
+      bash -cx "
+      dockerize -wait tcp://postgres:5432 -timeout 60s;
+      airflow db migrate &&
+      airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin;
+      "
     depends_on:
-      - scheduler
+      - postgres
+    restart: "no"
+    environment:
+      _AIRFLOW_DB_UPGRADE: "true"
+      _AIRFLOW_WEBSERVER_START: "false"
+      _AIRFLOW_SCHEDULER_START: "false"
+  
+  webserver:
+    <<: *airflow-common
+    command: airflow webserver # airflow api-server # <--- CORREÇÃO AQUI CASO USE 3.0.3
+    ports:
+      - "8080:8080"
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    # Pendência: Adicionar healthcheck para webserver
 
   scheduler:
-    <<: *airflow-common # usa a ancora la de cima
-    command: bash -c "airflow db migrate && airflow users create --username admin --firstname Yusuf --lastname Ganiyu --role Admin --email airscholar@gmail.com --password admin && airflow scheduler"
-    # Este comando executa uma sequência de operações:
-      # Obs: `&&`: o próximo comando só é executado se o anterior for bem-sucedido.
-    # - `airflow db migrate`: Inicializa ou migra o esquema do banco de dados do Airflow.
-    # - `airflow users create ...`: Cria um usuário administrador no Airflow.
-    # - `airflow scheduler`: Finalmente, inicia o scheduler do Airflow.
-
+    <<: *airflow-common
+    command: airflow scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    # Pendência: Adicionar healthcheck para scheduler
+  
 networks:
   code-with-yu:
 
