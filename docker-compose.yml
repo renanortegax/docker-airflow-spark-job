@@ -69,7 +69,7 @@ services: # aqui de fato é cada container que vai ser criado
   airflow-init:
     <<: *airflow-common
     container_name: airflow_init
-    # É VITAL ter 'dockerize' instalado no seu Dockerfile para que isso funcione!
+    # Precisa do 'dockerize' instalado no Dockerfile - comando para evitar que um container inicie antes do outro
     command: >
       bash -cx "
       dockerize -wait tcp://postgres:5432 -timeout 60s;
@@ -109,7 +109,3 @@ networks:
 # volumes: # Esta seção define os volumes nomeados
 #   pgdata: # Declara o volume nomeado 'pgdata'
 #     # Você pode adicionar drivers ou opções aqui, mas para o básico, deixar vazio já funciona.
-
-# TODO:
-    # A forma de inicialização no scheduler diretamente no 'command' não é ideal para múltiplos restarts
-      # - pois tentará criar o usuário e migrar o DB toda vez. O serviço `airflow_init` que sugeri anteriormente seria mais robusto.
