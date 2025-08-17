@@ -18,10 +18,27 @@ start = PythonOperator(
     dag=dag
 )
 
-python_job = SparkSubmitOperator(
-    task_id='python_job',
+python_job_1 = SparkSubmitOperator(
+    task_id='python_job_1',
     conn_id='spark-conn',
     application='jobs/python/wordcountjob.py',
+    conf={
+        "spark.pyspark.python": "python3.11",
+        "spark.pyspark.driver.python": "python3.11"
+    },
+    # application='/opt/airflow/jobs/python/wordcount.py',
+    dag=dag
+)
+
+python_job_2 = SparkSubmitOperator(
+    task_id='python_job_2',
+    conn_id='spark-conn',
+    application='jobs/python/show_df_spark.py',
+    conf={
+        "spark.pyspark.python": "python3.11",
+        "spark.pyspark.driver.python": "python3.11"
+    },
+    # application='/opt/airflow/jobs/python/wordcount.py',
     dag=dag
 )
 
@@ -31,4 +48,4 @@ end = PythonOperator(
     dag=dag
 )
 
-start >> python_job >> end
+start >> python_job_1 >> python_job_2 >> end
