@@ -1,0 +1,12 @@
+FROM bitnami/spark:3.5.6
+
+USER root
+RUN apt-get update && \
+    apt-get install -y python3.11 python3.11-distutils python3.11-venv && \
+    apt-get clean
+
+# Força o python3.11 como default pro Spark
+ENV PYSPARK_PYTHON=python3.11
+ENV PYSPARK_DRIVER_PYTHON=python3.11
+
+USER 1001
