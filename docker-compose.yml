@@ -6,7 +6,7 @@ x-spark-common: &spark-common # sao âncora que permitem que eu use esse bloco d
   volumes:
     - ./jobs:/opt/bitnami/spark/jobs # Mapeia a pasta local './jobs' para '/opt/bitnami/spark/jobs' no contêiner. Vai ser usada pros scripts em spark
   networks:
-    - code-with-yu # Conecta os serviços Spark à rede 'code-with-yu'
+    - rox-connection # Conecta os serviços Spark à rede 'rox-connection'
 
 x-airflow-common: &airflow-common # sao âncora que permitem que eu use esse bloco de configuracao mais pra frente -> vou usar em <<: *spark-common
   build:
@@ -21,7 +21,7 @@ x-airflow-common: &airflow-common # sao âncora que permitem que eu use esse blo
   depends_on:
     - postgres # Garante que o serviço 'postgres' seja iniciado antes deste. (Ainda sem o healthcheck, então não garante que o Postgres esteja *pronto*)
   networks:
-    - code-with-yu # Conecta os serviços Airflow à rede 'code-with-yu'.
+    - rox-connection # Conecta os serviços Airflow à rede 'rox-connection'.
 
 x-spark-worker-common: &spark-worker-common
   build:
@@ -64,7 +64,7 @@ services: # aqui de fato é cada container que vai ser criado
       - POSTGRES_PASSWORD=airflow
       - POSTGRES_DB=airflow
     networks:
-      - code-with-yu
+      - rox-connection
     volumes:
       - pgdata:/var/lib/postgresql/data # talvez ver de adicionar um volume nomeado aqui para persistir os dados do banco de dados
     ## esse "pgdata:" trata-se de um volume nomeado que o Docker cria automaticamente - geralmente /var/lib/docker/volumes/ no Linux (WSL)
@@ -108,7 +108,7 @@ services: # aqui de fato é cada container que vai ser criado
     # Pendência: Adicionar healthcheck para scheduler
   
 networks:
-  code-with-yu:
+  rox-connection:
 
 # Caso va adicionar volumes pra postgres
 volumes: # Esta seção define os volumes nomeados
