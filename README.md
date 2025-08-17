@@ -1,6 +1,10 @@
 # Execucao:
 
-## Criando a connection no Ariflow
+## Docker:
+`docker compose build --no-cache`<br>
+`docker compose up -d`
+
+## Criando a connection spark no Ariflow
 Necessario criar a conexão do spark com airflow (pra funcionar o SparkSubmitOperator):
 No airflow webserver (http://localhost:8080/):
 - Admin → Connections → `+`
@@ -10,10 +14,6 @@ No airflow webserver (http://localhost:8080/):
     - Host: spark://spark-master
         - `spark-master`: nome do container master do spark
     - Port: 7077
-
-## Comandos:
-`docker compose build --no-cache`<br>
-`docker compose up -d`
 
 ## Visualizar
 1. UI do Airflow: http://localhost:8080/
