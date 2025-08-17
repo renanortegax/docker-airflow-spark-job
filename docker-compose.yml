@@ -23,6 +23,21 @@ x-airflow-common: &airflow-common # sao âncora que permitem que eu use esse blo
   networks:
     - code-with-yu # Conecta os serviços Airflow à rede 'code-with-yu'.
 
+x-spark-worker-common: &spark-worker-common
+  build:
+    context: .
+    dockerfile: Dockerfile.spark
+  command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077 # Comando para iniciar um Spark Worker, conectando-o ao Master
+  depends_on:
+    - spark-master # garante que o spark-master esteja rodando
+  environment: # variaveis de ambiente pro worker
+    SPARK_MODE: worker
+    SPARK_WORKER_CORES: 2
+    SPARK_WORKER_MEMORY: 1g
+    SPARK_MASTER_URL: spark://spark-master:7077
+    PYSPARK_PYTHON: python3.11
+    PYSPARK_DRIVER_PYTHON: python3.11
+
 services: # aqui de fato é cada container que vai ser criado
   spark-master:
     <<: *spark-common # usa a ancora la de cima
@@ -36,21 +51,11 @@ services: # aqui de fato é cada container que vai ser criado
     environment:
       PYSPARK_PYTHON: python3.11
       PYSPARK_DRIVER_PYTHON: python3.11
-  spark-worker:
-    <<: *spark-common # usa a ancora la de cima
-    build:
-      context: .
-      dockerfile: Dockerfile.spark
-    command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077 # Comando para iniciar um Spark Worker, conectando-o ao Master
-    depends_on:
-      - spark-master # garante que o spark-master esteja rodando
-    environment: # variaveis de ambiente pro worker
-      SPARK_MODE: worker
-      SPARK_WORKER_CORES: 2
-      SPARK_WORKER_MEMORY: 1g
-      SPARK_MASTER_URL: spark://spark-master:7077
-      PYSPARK_PYTHON: python3.11
-      PYSPARK_DRIVER_PYTHON: python3.11
+  spark-worker-1:
+    <<: [*spark-common, *spark-worker-common] # usa a ancora la de cima
+  
+  spark-worker-2:
+    <<: [*spark-common, *spark-worker-common] # usa a ancora la de cima
   
   postgres:
     image: postgres:14.0

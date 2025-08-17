@@ -42,10 +42,21 @@ python_job_2 = SparkSubmitOperator(
     dag=dag
 )
 
+test_cluster = SparkSubmitOperator(
+    task_id="test_spark_cluster",
+    conn_id="spark-conn",
+    application="jobs/python/test_cluster.py",
+    conf={
+        "spark.pyspark.python": "python3.11",
+        "spark.pyspark.driver.python": "python3.11"
+    },
+    dag=dag,
+)
+
 end = PythonOperator(
     task_id='end',
     python_callable=lambda: print("Jobs completed"),
     dag=dag
 )
 
-start >> python_job_1 >> python_job_2 >> end
+start >> python_job_1 >> python_job_2 >> test_cluster >> end
