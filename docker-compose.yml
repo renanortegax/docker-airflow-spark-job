@@ -1,11 +1,12 @@
 version: '3.8'
 
 x-spark-common: &spark-common # sao âncora que permitem que eu use esse bloco de configuracao mais pra frente -> vou usar em <<: *spark-common
-  image: bitnami/spark:latest # Imagem Docker pro Spark
+  # image: bitnami/spark:latest # Imagem Docker pro Spark
+  # image: bitnami/spark:3.5.6 # Imagem Docker pro Spark -> a image vai ser utilizada do Dockerfile.spark
   volumes:
     - ./jobs:/opt/bitnami/spark/jobs # Mapeia a pasta local './jobs' para '/opt/bitnami/spark/jobs' no contêiner. Vai ser usada pros scripts em spark
   networks:
-    - code-with-yu # Conecta os serviços Spark à rede 'code-with-yu' (>>>isso estava no video.. mas nao me parece fazer sentido<<<)
+    - code-with-yu # Conecta os serviços Spark à rede 'code-with-yu'
 
 x-airflow-common: &airflow-common # sao âncora que permitem que eu use esse bloco de configuracao mais pra frente -> vou usar em <<: *spark-common
   build:
@@ -25,6 +26,9 @@ x-airflow-common: &airflow-common # sao âncora que permitem que eu use esse blo
 services: # aqui de fato é cada container que vai ser criado
   spark-master:
     <<: *spark-common # usa a ancora la de cima
+    build:
+      context: .
+      dockerfile: Dockerfile.spark
     command: bin/spark-class org.apache.spark.deploy.master.Master # Comando para iniciar o Spark Master dentro do contêiner
     ports:
       - "9090:8080" # Mapeia a porta 8080 do contêiner (UI do Spark Master) para a porta 9090 no meu host
@@ -34,6 +38,9 @@ services: # aqui de fato é cada container que vai ser criado
       PYSPARK_DRIVER_PYTHON: python3.11
   spark-worker:
     <<: *spark-common # usa a ancora la de cima
+    build:
+      context: .
+      dockerfile: Dockerfile.spark
     command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077 # Comando para iniciar um Spark Worker, conectando-o ao Master
     depends_on:
       - spark-master # garante que o spark-master esteja rodando
